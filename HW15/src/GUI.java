@@ -24,7 +24,7 @@ public class GUI extends JFrame {
     public static void GET(String transl, String languageTR){
         Get get = new Get();
         String httpLA = "https://translate.yandex.net/api/v1.5/tr.json/detect?";
-        String textLA = "text="+transl;
+        String textLA = "&text="+transl;
         String httpTR = "https://translate.yandex.net/api/v1.5/tr.json/translate?";
         String key = ""; // Здесь нужно прописать значение API Key!!!!!!!!!!!!!!!!(на конце не нужно добавлять "&")
         String text = "&text="+transl+"&";
