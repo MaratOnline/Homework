@@ -1,37 +1,67 @@
+import java.sql.*;
 import java.util.Scanner;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- * Created by Марат on 14.12.13.
+ * Created by Марат on 17.12.13.
  */
 public class Main {
-    public static void Convert(String number){
-        Pattern patternDollar = Pattern.compile("(\\$[0-9]{0,}(.|,)[0-9]{1,2})|(\\$[0-9]{0,})");
-        Pattern patternEuro = Pattern.compile("(\\€[0-9]{0,}(.|,)[0-9]{1,2})|(\\€[0-9]{0,})");
-        Matcher matcherDollar = patternDollar.matcher(number);
-        Matcher matcherEuro = patternEuro.matcher(number);
-        String flag;
-        double num = 0;
-        if (matcherDollar.find()) {
-            flag = matcherDollar.group().replace("$","");
-            System.out.println(flag);
-            num = Double.parseDouble(flag);
-            num = num*32.87;
-            num = Math.rint(100.0*num)/100.0;
-        } else if (matcherEuro.find()) {
-            flag = matcherEuro.group().replace("€","");
-            num = Double.parseDouble(flag);
-            num = num*45.19;
-            num = Math.rint(100.0*num)/100.0;
-        }
-        System.out.println(num);
 
-    }
     public static void main(String[] args) {
-        System.out.print("Введите число в долларах или евро: ");
-        Scanner sc = new Scanner(System.in);
-        String num=sc.next();
-        Convert(num);
+
+        Connection connection = null;
+        String url = "jdbc:mysql://localhost:3306/kino";
+
+        String name = "root";
+        String password = "admin";
+
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            connection = DriverManager.getConnection(url, name, password);
+
+            Statement st = connection.createStatement();
+            st.executeUpdate("DROP TABLE IF EXISTS updatedrating;");
+            st.executeUpdate("CREATE TABLE updatedrating AS SELECT imdb.name, imdb.year, imdb.rating\n" +
+                    "FROM imdb LEFT JOIN kinopoisk ON (imdb.name = kinopoisk.name AND imdb.year = kinopoisk.year)\n"+
+                    "WHERE (kinopoisk.name IS NULL)\n"+
+                    "UNION SELECT kinopoisk.name, kinopoisk.year, kinopoisk.rating\n" +
+                    "FROM kinopoisk LEFT JOIN imdb ON (imdb.name = kinopoisk.name AND imdb.year = kinopoisk.year)");
+
+            st.executeUpdate(
+                    "UPDATE updatedrating SET rating = (COALESCE((SELECT rating FROM imdb WHERE name = updatedrating.name AND year = updatedrating.year),0) + (COALESCE((SELECT rating FROM kinopoisk WHERE name = updatedrating.name AND year = updatedrating.year),0)))/2"
+            );
+
+            Statement statement = connection.createStatement();
+            ResultSet result1 = statement.executeQuery("SELECT * FROM updatedrating ORDER BY rating DESC");
+
+            Scanner sc = new Scanner(System.in);
+            int count = 0;
+
+            Statement forcount = connection.createStatement();
+            ResultSet resultSet = forcount.executeQuery("SELECT * FROM updatedrating");
+            while(resultSet.next()) {
+                count++;
+            }
+            System.out.print("Введите место в Общем рейтинге: ");
+            int a = sc.nextInt();
+            if(a<1||a>count)
+                System.out.print("Выход за пределы таблицы");
+            else {
+                for(int i = 0; i<a; i++)
+                result1.next();
+                System.out.print(result1.getString("name")+" ("+ result1.getString("year")+")"+" – "+result1.getString("rating"));
+            }
+        } catch (Exception ex) {
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (SQLException ex) {
+                    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
     }
 }
